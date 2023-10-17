@@ -9,10 +9,13 @@
 
 #define DEFAULT_VEC_CAP 8
 
-typedef void *vec_data_t;
-
 /// @brief The Vector collection
-typedef struct _vec vec_t;
+typedef struct _vec {
+  size_t size;
+  size_t cap;
+  size_t obj_size;
+  char *buf;
+} vec_t;
 
 /// @brief create a new vector
 /// @param obj_size the size of each element
@@ -32,7 +35,7 @@ bool vec_drop(vec_t *);
 /// @brief push one element into the vector
 /// @param
 /// @param
-bool vec_push(vec_t *, const vec_data_t);
+bool vec_push(vec_t *, const void *);
 
 /// @brief pop out the last element on the heap memory!!
 /// @param
@@ -40,7 +43,7 @@ bool vec_push(vec_t *, const vec_data_t);
 bool vec_del_top(vec_t *);
 
 /// Check the top element in the vector
-const vec_data_t vec_top(const vec_t *);
+const void *vec_top(const vec_t *);
 
 /// @brief deep copy a vector
 /// @param
@@ -52,14 +55,13 @@ vec_t *vec_clone(vec_t *);
 /// @param array_size
 /// @param obj_size
 /// @return
-vec_t *vec_from_array(const vec_data_t _arr, size_t array_size,
-                      size_t obj_size);
+vec_t *vec_from_array(const void *_arr, size_t array_size, size_t obj_size);
 
 /// @brief Insert an element into the vector with an index
 /// @param vec
 /// @param data
 /// @param idx
-bool vec_insert(vec_t *vec, const vec_data_t data, size_t idx);
+bool vec_insert(vec_t *vec, const void *data, size_t idx);
 
 /// @brief delete an item at the input index
 /// @param vec
@@ -71,7 +73,7 @@ bool vec_del_at(vec_t *vec, const size_t idx);
 /// @param vec
 /// @param idx
 /// @return
-const vec_data_t vec_at(const vec_t *vec, const size_t idx);
+const void *vec_at(const vec_t *vec, const size_t idx);
 
 /// @brief
 ///         comparison function which returns ​a negative integer
@@ -86,13 +88,6 @@ bool vec_sort(vec_t *vec, int (*cmp_fn)(const void *, const void *));
 /// @param vec
 /// @return
 bool vec_reverse(vec_t *vec);
-
-typedef struct _vec {
-  size_t size;
-  size_t cap;
-  size_t obj_size;
-  char *buf;
-} vec_t;
 
 vec_t *vec_new(size_t obj_size) {
   char *buf = (char *)malloc(obj_size * DEFAULT_VEC_CAP);
@@ -153,7 +148,7 @@ static bool vec_enlarge(vec_t *vec, size_t new_cap) {
   return true;
 }
 
-bool vec_push(vec_t *vec, const vec_data_t data) {
+bool vec_push(vec_t *vec, const void *data) {
   assert(vec && data);
   if (vec->cap == vec->size) {
     if (!vec_enlarge(vec, vec->cap * 2)) return false;
@@ -184,8 +179,7 @@ vec_t *vec_clone(vec_t *vec) {
   return v;
 }
 
-vec_t *vec_from_array(const vec_data_t _arr, size_t array_size,
-                      size_t obj_size) {
+vec_t *vec_from_array(const void *_arr, size_t array_size, size_t obj_size) {
   size_t cap = (array_size % 2 == 0) ? array_size : array_size + 1;
   vec_t *v = vec_new_with_cap(obj_size, cap);
   if (!v) return NULL;
@@ -194,7 +188,7 @@ vec_t *vec_from_array(const vec_data_t _arr, size_t array_size,
   return v;
 }
 
-bool vec_insert(vec_t *vec, const vec_data_t _data, size_t idx) {
+bool vec_insert(vec_t *vec, const void *_data, size_t idx) {
   assert(vec && _data && vec->size > idx);
   if (vec->cap == vec->size) {
     if (!vec_enlarge(vec, vec->cap * 2)) return false;
@@ -225,15 +219,13 @@ bool vec_del_at(vec_t *vec, const size_t idx) {
   return true;
 }
 
-const vec_data_t vec_at(const vec_t *vec, const size_t idx) {
+const void *vec_at(const vec_t *vec, const size_t idx) {
   assert(vec && vec->size > idx);
   char *ptr = vec->buf + vec->obj_size * idx;
   return (void *)ptr;
 }
 
-const vec_data_t vec_top(const vec_t *vec) {
-  return vec_at(vec, vec->size - 1);
-}
+const void *vec_top(const vec_t *vec) { return vec_at(vec, vec->size - 1); }
 
 bool vec_reverse(vec_t *v) {
   assert(v);

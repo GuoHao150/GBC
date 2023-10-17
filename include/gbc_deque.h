@@ -10,7 +10,14 @@
 #define DEFAULT_DQ_SIZE 8
 
 /// @brief vector double-ended queue
-typedef struct _vdq_t vdq_t;
+typedef struct _vdq_t {
+  size_t obj_size;
+  size_t front;
+  size_t rear;
+  size_t cap;
+  size_t size;
+  char *buf;
+} vdq_t;
 
 /// @brief create a new vdq_t
 /// @param element_size: the size of each element
@@ -116,14 +123,12 @@ bool vdq_reverse(vdq_t *q);
 /// sort the vdq_t
 bool vdq_sort(vdq_t *q, int (*cmp_fn)(const void *, const void *));
 
-typedef struct _vdq_t {
-  size_t obj_size;
-  size_t front;
-  size_t rear;
-  size_t cap;
-  size_t size;
-  char *buf;
-} vdq_t;
+/// @brief create a vdq_t from an array
+/// @param _arr
+/// @param array_size
+/// @param obj_size
+/// @return
+vdq_t *vdq_from_array(const void *_arr, size_t array_size, size_t obj_size);
 
 vdq_t *vdq_new(size_t element_size) {
   char *buf = (char *)malloc(DEFAULT_DQ_SIZE * element_size);
@@ -283,7 +288,7 @@ const void *vdq_front(const vdq_t *q) {
 
 const void *vdq_back(const vdq_t *q) {
   assert(q);
-  if (q->size) return NULL;
+  if (q->size == 0) return NULL;
   char *ptr = q->buf + ((q->rear + q->cap - 1) % q->cap) * q->obj_size;
   return ptr;
 }
@@ -364,6 +369,17 @@ bool vdq_sort(vdq_t *q, int (*cmp_fn)(const void *, const void *)) {
   if (!vdq_enlarge(q, q->cap)) return false;
   qsort(q->buf, q->size, q->obj_size, cmp_fn);
   return true;
+}
+
+vdq_t *vdq_from_array(const void *_arr, size_t array_size, size_t obj_size) {
+  size_t cap = (array_size % 2 == 0) ? array_size : array_size + 1;
+  vdq_t *q = vdq_new_with_cap(obj_size, cap);
+  if (!q) return NULL;
+  q->size = array_size;
+  memcpy(q->buf, _arr, obj_size * array_size);
+  q->front = 0;
+  q->rear = array_size;
+  return q;
 }
 
 #endif
