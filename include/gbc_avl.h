@@ -39,11 +39,15 @@ typedef int (*avl_cmp_fn)(const void *, const void *);
 
 typedef void (*avl_foreach)(const void *key, const void *val);
 
+/// @brief the key-value pair for the avl tree
 typedef struct _avl_pair {
   char *key;
   char *val;
 } avl_pair_t;
 
+/// @brief avl tree node
+/// @param height: the height of node
+/// @param pair: the key-value pair
 typedef struct _avl_node {
   size_t height;
   avl_pair_t pair;
@@ -51,6 +55,55 @@ typedef struct _avl_node {
   avl_node_t *left;
   avl_node_t *right;
 } avl_node_t;
+
+/// @brief create a new avl_map_t
+/// @param key_obj_size: object size of the key
+/// @param value_obj_size: object size of the value
+/// @param cmp_fn: compare funciton of the keys
+/// @return
+avl_map_t *avl_map_new(size_t key_obj_size, size_t value_obj_size,
+                       int (*cmp_fn)(const void *, const void *));
+
+/// @brief adding key-value pair into the map. Update the value if the key
+/// exists
+/// @param map
+/// @param key
+/// @param value
+/// @return
+bool avl_map_add(avl_map_t *map, const avl_key_t key, const avl_val_t value);
+
+/// @brief delete the key-value pair out of the map. return false if not
+/// contains the key
+/// @param map
+/// @param key
+/// @return
+bool avl_map_del(avl_map_t *map, const avl_key_t key);
+
+/// @brief check if the key exists in the map
+/// @param map
+/// @param key
+/// @return
+bool avl_map_contains(const avl_map_t *map, const avl_key_t key);
+
+/// @brief get the const pointer of the value given a key
+/// @param map
+/// @param key
+/// @return
+const avl_val_t avl_map_get(const avl_map_t *map, const avl_key_t key);
+
+/// @brief get the mutable pointer of the value given a key
+/// @param map
+/// @param key
+/// @return
+avl_val_t avl_map_get(avl_map_t *map, const avl_key_t key);
+
+/// @brief update the key-value pair in the map, if the key not exists then add
+/// the pair into the map
+/// @param map
+/// @param key
+/// @param value
+/// @return
+bool avl_map_update(avl_map_t *map, const avl_key_t key, const avl_val_t value);
 
 avl_node_t *avl_node_new(const avl_key_t _key, size_t _key_obj_size,
                          const avl_val_t _value, size_t _value_obj_size) {
@@ -167,7 +220,9 @@ static avl_node_t *avl_right_rotate(avl_node_t *y, avl_node_t *parent_n,
   x->right = y;
   y->parent = x;
   y->left = t3;
-  t3->parent = y;
+  if (t3) {
+    t3->parent = y;
+  }
   avl_relink(x, parent_n, map);
 
   y->height = 1 + avl_max(avl_node_height(y->left), avl_node_height(y->right));
@@ -190,7 +245,9 @@ static avl_node_t *avl_left_rotate(avl_node_t *y, avl_node_t *parent_n,
   x->left = y;
   y->parent = x;
   y->right = t2;
-  t2->parent = y;
+  if (t2) {
+    t2->parent = y;
+  }
   avl_relink(x, parent_n, map);
 
   y->height = 1 + avl_max(avl_node_height(y->left), avl_node_height(y->right));
@@ -330,14 +387,14 @@ bool avl_map_add(avl_map_t *map, const avl_key_t _key, const avl_val_t _val) {
     map->size++;
     new_node->parent = NULL;
     map->root = new_node;
-    return;
+    return true;
   }
   avl_node_t *parent_n = map->root;
   for (;;) {
     int order = map->cmp_fn(_key, parent_n->pair.key);
     if (order == 0) {
       avl_node_update(parent_n, _val, map->val_obj_size);
-      return;
+      return true;
     } else if (order < 0) {
       if (parent_n->left) {
         parent_n = parent_n->left;
@@ -432,7 +489,13 @@ const avl_val_t avl_map_get(const avl_map_t *map, const avl_key_t key) {
   return (void *)node->pair.val;
 }
 
-bool avl_map_set(avl_map_t *map, const avl_key_t key, const avl_val_t val) {
+avl_val_t avl_map_get_mut(avl_map_t *map, const avl_key_t key) {
+  avl_node_t *node = avl_get_node_mut(map, key);
+  if (!node) return NULL;
+  return (void *)node->pair.val;
+}
+
+bool avl_map_update(avl_map_t *map, const avl_key_t key, const avl_val_t val) {
   avl_node_t *node = avl_get_node_mut(map, key);
   if (!node) return avl_map_add(map, key, val);
   avl_node_update(node, val, map->val_obj_size);
@@ -461,19 +524,20 @@ bool avl_map_drop(avl_map_t *map) {
     bool flag = avl_map_del_min(map);
     if (!flag) return false;
   }
+  map = NULL;
   return true;
 }
 
-void avl_map_middle_order(const avl_map_t *map, avl_foreach fn) {
-  _avl_map_middle_order(map->root, fn);
+void avl_map_middle_order_impl(const avl_node_t *node, avl_foreach fn) {
+  if (node) {
+    avl_map_middle_order_impl(node->left, fn);
+    fn(node->pair.key, node->pair.val);
+    avl_map_middle_order_impl(node->right, fn);
+  }
 }
 
-void _avl_map_middle_order(const avl_node_t *node, avl_foreach fn) {
-  if (node) {
-    _avl_map_middle_order(node->left, fn);
-    fn(node->pair.key, node->pair.val);
-    _avl_map_middle_order(node->right, fn);
-  }
+void avl_map_middle_order(const avl_map_t *map, avl_foreach fn) {
+  avl_map_middle_order_impl(map->root, fn);
 }
 
 #endif
