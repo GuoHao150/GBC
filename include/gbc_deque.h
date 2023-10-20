@@ -78,6 +78,12 @@ const void *vdq_back(const vdq_t *q);
 /// @return
 const void *vdq_at(const vdq_t *q, size_t idx);
 
+/// @brief Get the mutable pointer with an index
+/// @param q
+/// @param idx
+/// @return
+void *vdq_at_mut(vdq_t *q, size_t idx);
+
 /// @brief update the value in the vdq_t with an index
 /// @param q
 /// @param idx
@@ -294,6 +300,12 @@ const void *vdq_back(const vdq_t *q) {
 }
 
 const void *vdq_at(const vdq_t *q, size_t idx) {
+  assert(q && q->size > idx);
+  char *ptr = q->buf + ((q->front + idx) % q->cap) * q->obj_size;
+  return ptr;
+}
+
+void *vdq_at_mut(vdq_t *q, size_t idx) {
   assert(q && q->size > idx);
   char *ptr = q->buf + ((q->front + idx) % q->cap) * q->obj_size;
   return ptr;

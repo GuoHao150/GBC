@@ -61,7 +61,7 @@ vec_t *vec_from_array(const void *_arr, size_t array_size, size_t obj_size);
 /// @param vec
 /// @param data
 /// @param idx
-bool vec_insert(vec_t *vec, const void *data, size_t idx);
+bool vec_insert(vec_t *vec, size_t idx, const void *data);
 
 /// @brief delete an item at the input index
 /// @param vec
@@ -74,6 +74,20 @@ bool vec_del_at(vec_t *vec, const size_t idx);
 /// @param idx
 /// @return
 const void *vec_at(const vec_t *vec, const size_t idx);
+
+/// @brief get the mutable pointer at the input index
+/// @param vec
+/// @param idx
+/// @return
+void *vec_at_mut(vec_t *vec, size_t idx);
+
+/// @brief update the value given an index
+bool vec_update(vec_t *q, size_t idx, const void *value);
+
+/// @brief foreach function of vector
+/// @param
+/// @param
+void vec_foreach(const vec_t *, void (*)(const void *));
 
 /// @brief
 ///         comparison function which returns ​a negative integer
@@ -188,7 +202,7 @@ vec_t *vec_from_array(const void *_arr, size_t array_size, size_t obj_size) {
   return v;
 }
 
-bool vec_insert(vec_t *vec, const void *_data, size_t idx) {
+bool vec_insert(vec_t *vec, size_t idx, const void *_data) {
   assert(vec && _data && vec->size > idx);
   if (vec->cap == vec->size) {
     if (!vec_enlarge(vec, vec->cap * 2)) return false;
@@ -223,6 +237,25 @@ const void *vec_at(const vec_t *vec, const size_t idx) {
   assert(vec && vec->size > idx);
   char *ptr = vec->buf + vec->obj_size * idx;
   return (void *)ptr;
+}
+
+void *vec_at_mut(vec_t *vec, size_t idx) {
+  assert(vec && vec->size > idx);
+  char *ptr = vec->buf + vec->obj_size * idx;
+  return (void *)ptr;
+}
+
+bool vec_update(vec_t *vec, size_t idx, const void *value) {
+  void *ptr = vec_at_mut(vec, idx);
+  memcpy(ptr, value, vec->obj_size);
+  return true;
+}
+
+void vec_foreach(const vec_t *vec, void (*foreach_fn)(const void *)) {
+  assert(vec);
+  for (int i = 0; i < vec->size; ++i) {
+    foreach_fn(vec_at(vec, i));
+  }
 }
 
 const void *vec_top(const vec_t *vec) { return vec_at(vec, vec->size - 1); }
