@@ -24,7 +24,7 @@ void test_map_new(void) {
     avl_map_add(map, &i, &i);
   }
   assert(map->size == n);
-  // avl_map_middle_order(map, int_pair_print);
+  avl_map_middle_order(map, int_pair_print);
   avl_map_drop(map);
 }
 

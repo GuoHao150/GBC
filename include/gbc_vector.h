@@ -37,11 +37,6 @@ bool vec_drop(vec_t *);
 /// @param
 bool vec_push(vec_t *, const void *);
 
-/// @brief pop out the last element on the heap memory!!
-/// @param
-/// @return
-bool vec_del_top(vec_t *);
-
 /// Check the top element in the vector
 const void *vec_top(const vec_t *);
 
@@ -68,6 +63,20 @@ bool vec_insert(vec_t *vec, size_t idx, const void *data);
 /// @param idx
 /// @return
 bool vec_del_at(vec_t *vec, const size_t idx);
+
+/// @brief pop out the last element on the heap memory!!
+/// @param
+/// @return
+bool vec_del_top(vec_t *);
+
+/// @brief delete a target value in the vector, return false if the value was
+/// not in the vector
+/// @param
+/// @param target_value
+/// @param cmp_fn
+/// @return
+bool vec_del(vec_t *, const void *target_value,
+             int (*cmp_fn)(const void *, const void *));
 
 /// @brief get the element in the vector at the input index
 /// @param vec
@@ -231,6 +240,25 @@ bool vec_del_at(vec_t *vec, const size_t idx) {
           vec->obj_size * (vec->size - idx - 1));
   vec->size--;
   return true;
+}
+
+bool vec_del(vec_t *vec, const void *target_value,
+             int (*cmp_fn)(const void *, const void *)) {
+  size_t idx;
+  bool flag = false;
+  for (int i = 0; i < vec->size; ++i) {
+    const void *ele = vec_at(vec, i);
+    int order = cmp_fn(ele, target_value);
+    if (order == 0) {
+      flag = true;
+      idx = i;
+      break;
+    }
+  }
+  if (flag) {
+    return vec_del_at(vec, idx);
+  }
+  return flag;
 }
 
 const void *vec_at(const vec_t *vec, const size_t idx) {

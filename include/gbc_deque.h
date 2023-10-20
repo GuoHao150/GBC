@@ -110,7 +110,15 @@ bool vdq_del_back(vdq_t *q);
 /// @param q
 /// @param idx
 /// @return
-bool vdq_del(vdq_t *q, size_t idx);
+bool vdq_del_at(vdq_t *q, size_t idx);
+
+/// @brief delete an element out of the vdq_t
+/// @param q
+/// @param target_value
+/// @param cmp_fn
+/// @return
+bool vdq_del(vdq_t *q, const void *target_value,
+             int (*cmp_fn)(const void *, const void *));
 
 /// @brief create a new vdq_t with specified capacity size
 /// @param element_size
@@ -338,7 +346,7 @@ bool vdq_del_back(vdq_t *q) {
   return true;
 }
 
-bool vdq_del(vdq_t *q, size_t idx) {
+bool vdq_del_at(vdq_t *q, size_t idx) {
   assert(q && q->size > idx);
   if (idx == 0)
     return vdq_del_front(q);
@@ -355,6 +363,26 @@ bool vdq_del(vdq_t *q, size_t idx) {
     q->rear = (q->rear + q->cap - 1) % q->cap;
     return true;
   }
+}
+
+bool vdq_del(vdq_t *q, const void *target_value,
+             int (*cmp_fn)(const void *, const void *)) {
+  size_t idx;
+  bool flag = false;
+  for (int i = 0; i < q->size; ++i) {
+    const void *ele = vdq_at(q, i);
+    int order = cmp_fn(ele, target_value);
+    if (order == 0) {
+      flag = true;
+      idx = i;
+      break;
+    }
+  }
+  if (flag) {
+    return vdq_del_at(q, idx);
+  }
+
+  return flag;
 }
 
 bool vdq_reverse(vdq_t *q) {

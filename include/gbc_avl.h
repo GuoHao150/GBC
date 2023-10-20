@@ -95,7 +95,7 @@ const avl_val_t avl_map_get(const avl_map_t *map, const avl_key_t key);
 /// @param map
 /// @param key
 /// @return
-avl_val_t avl_map_get(avl_map_t *map, const avl_key_t key);
+avl_val_t avl_map_get_mut(avl_map_t *map, const avl_key_t key);
 
 /// @brief update the key-value pair in the map, if the key not exists then add
 /// the pair into the map

@@ -39,7 +39,7 @@ void test_deque_del(void) {
   printf("test del\n");
   vdq_del_back(q_int);
   vdq_del_front(q_int);
-  vdq_del(q_int, 1);
+  vdq_del_at(q_int, 1);
   for (int i = 0; i < q_int->size; ++i) {
     const int *o = vdq_at(q_int, i);
     printf("%d\n", *o);
