@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gbc_vector.h"
+
 #define avl_max(a, b) (((a) < (b)) ? (b) : (a))
 
 /// @brief the avl key type
@@ -179,6 +181,31 @@ avl_map_t *avl_map_new(size_t key_obj_size, size_t value_obj_size,
   return tree;
 }
 
+static void avl_unlink(avl_node_t *child, avl_node_t *parent, avl_map_t *map) {
+  if (child && parent) {
+    int order = map->cmp_fn(child->pair.key, parent->pair.key);
+    if (order < 0) {
+      parent->left = NULL;
+    } else {
+      parent->right = NULL;
+    }
+    child->parent = NULL;
+  } else if (child && !parent) {
+    child->parent = NULL;
+    map->root = child;
+  }
+}
+
+static void avl_set_left(avl_node_t *node, avl_node_t *left_child) {
+  if (node) node->left = left_child;
+  if (left_child) left_child->parent = node;
+}
+
+static void avl_set_right(avl_node_t *node, avl_node_t *right_child) {
+  if (node) node->right = right_child;
+  if (right_child) right_child->parent = node;
+}
+
 static void avl_relink(avl_node_t *child, avl_node_t *parent, avl_map_t *map) {
   if (!child && !parent)
     return;
@@ -258,7 +285,7 @@ static avl_node_t *avl_left_rotate(avl_node_t *y, avl_node_t *parent_n,
 static avl_node_t *avl_find_min_child(avl_node_t *node) {
   if (!node) return NULL;
   avl_node_t *_node = node;
-  avl_node_t *out;
+  avl_node_t *out = node;
   for (;;) {
     if (!_node->left) {
       out = _node;
@@ -274,7 +301,7 @@ static avl_node_t *avl_find_min_child(avl_node_t *node) {
 static avl_node_t *avl_find_max_child(avl_node_t *node) {
   if (!node) return NULL;
   avl_node_t *_node = node;
-  avl_node_t *out;
+  avl_node_t *out = node;
   for (;;) {
     if (!_node->right) {
       out = _node;
@@ -422,56 +449,49 @@ bool avl_map_add(avl_map_t *map, const avl_key_t _key, const avl_val_t _val) {
 }
 
 bool avl_map_del(avl_map_t *map, const avl_key_t key) {
-  avl_node_t *del_node = avl_get_node_mut(map, key);
-  if (!del_node) {
-    return false;
-  }
-  avl_node_t *fix_node = NULL;
-  for (;;) {
-    if (!del_node) {
-      break;
+  avl_node_t *target_node = avl_get_node_mut(map, key);
+  if (!target_node) return false;
+  map->size--;
+  avl_node_t *cur_parent = target_node->parent;
+  avl_node_t *cur_left = target_node->left;
+  avl_node_t *cur_right = target_node->right;
+  if (cur_left && cur_right) {
+    avl_node_t *cur_left_max = avl_find_max_child(cur_left);
+    avl_unlink(cur_left_max, cur_left_max->parent, map);
+    avl_relink(cur_left_max, cur_parent, map);
+    avl_set_right(cur_left_max, cur_right);
+    if (cur_left_max != cur_left) {
+      avl_set_left(cur_left_max, cur_left);
     }
-    avl_node_t *cur_parent = del_node->parent;
-    avl_node_t *cur_left = del_node->left;
-    avl_node_t *cur_right = del_node->right;
-    int order = map->cmp_fn(cur_parent->pair.key, del_node->pair.key);
-
-    if (cur_left && cur_right) {
-      avl_node_t *succrssor_node = avl_find_min_child(cur_right);
-      avl_swap_kv(del_node, succrssor_node);
-      del_node = succrssor_node;
-      continue;
-    } else if (cur_left && !cur_right) {
-      avl_relink(cur_left, cur_parent, map);
-      avl_node_drop(del_node);
-      map->size--;
-      fix_node = cur_left;
-      break;
-    } else if (!cur_left && cur_right) {
-      avl_relink(cur_right, cur_parent, map);
-      avl_node_drop(del_node);
-      fix_node = cur_right;
-      break;
-    } else {
-      // !cur_right && !cur_left
-      map->size--;
-      if (!cur_parent) {
-        map->root = NULL;
-        avl_node_drop(del_node);
-        fix_node = NULL;
-        break;
-      } else {
-        if (order < 0)
-          cur_parent->right = NULL;
-        else
-          cur_parent->left = NULL;
-        avl_node_drop(del_node);
-        fix_node = cur_parent;
-        break;
-      }
-    }
+    avl_try_reblance(map, cur_left_max);
+  } else if (cur_left && !cur_right && cur_parent) {
+    cur_left->parent = NULL;
+    target_node->left = NULL;
+    avl_relink(cur_left, cur_parent, map);
+    avl_try_reblance(map, cur_left);
+  } else if (cur_left && !cur_right && !cur_parent) {
+    target_node->left = NULL;
+    cur_left->parent = NULL;
+    map->root = cur_left;
+    avl_try_reblance(map, cur_left);
+  } else if (!cur_left && cur_right && cur_parent) {
+    target_node->right = NULL;
+    cur_right->parent = NULL;
+    avl_relink(cur_right, cur_parent, map);
+    avl_try_reblance(map, cur_right);
+  } else if (!cur_left && cur_right && !cur_parent) {
+    target_node->right = NULL;
+    cur_right->parent = NULL;
+    map->root = cur_right;
+    avl_try_reblance(map, cur_right);
+  } else if (!cur_left && !cur_right && cur_parent) {
+    avl_unlink(target_node, cur_parent, map);
+    avl_try_reblance(map, cur_parent);
+  } else {
+    // !cur_left && !cur_right && !cur_parent
+    map->root = NULL;
   }
-  avl_try_reblance(map, fix_node);
+  avl_node_drop(target_node);
   return true;
 }
 
@@ -520,7 +540,8 @@ bool avl_map_del_max(avl_map_t *map) {
 
 bool avl_map_drop(avl_map_t *map) {
   assert(map);
-  for (int i = 0; i < map->size; ++i) {
+  size_t len = map->size;
+  for (int i = 0; i < len; ++i) {
     bool flag = avl_map_del_min(map);
     if (!flag) return false;
   }
