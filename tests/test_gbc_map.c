@@ -30,12 +30,12 @@ void test_map_del(void) {
   avl_map_del(map, &k1);
   avl_map_del(map, &k2);
   avl_map_del(map, &k3);
-  avl_map_middle_order(map, int_pair_print);
+  avl_map_foreach(map, int_pair_print);
   printf("~~~~~~~~~~~~~~\n");
   assert(map->size == n - 3);
   for (int i = 0; i < n; ++i) {
     avl_map_del(map, &i);
-    avl_map_middle_order(map, int_pair_print);
+    avl_map_foreach(map, int_pair_print);
     printf("~~~~~~~~~~~~~~\n");
   }
   assert(map->size == 0);
@@ -58,7 +58,7 @@ void test_map_new(void) {
     avl_map_add(map, &i, &i);
   }
   assert(map->size == n);
-  avl_map_middle_order(map, int_pair_print);
+  avl_map_foreach(map, int_pair_print);
   printf("del\n");
   int k = 5;
   int k2 = 10;
@@ -67,14 +67,14 @@ void test_map_new(void) {
   avl_map_del(map, &k2);
   avl_map_del(map, &k3);
   assert(map->size == n - 3);
-  avl_map_middle_order(map, int_pair_print);
+  avl_map_foreach(map, int_pair_print);
   int x = 0;
   for (int i = 0; i < map->size; ++i) {
     bool flag = avl_map_del_min(map);
     x++;
   }
   printf("del2\n");
-  avl_map_middle_order(map, int_pair_print);
+  avl_map_foreach(map, int_pair_print);
   avl_map_drop(map);
 }
 

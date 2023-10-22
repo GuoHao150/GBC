@@ -167,6 +167,13 @@ typedef struct _avl_map {
   size_t val_obj_size;
 } avl_map_t;
 
+static char set_value[0];
+
+typedef struct _avl_set {
+  avl_map_t *map;
+  size_t size;
+} avl_set_t;
+
 avl_map_t *avl_map_new(size_t key_obj_size, size_t value_obj_size,
                        avl_cmp_fn cmp_fn) {
   avl_map_t *tree = (avl_map_t *)malloc(sizeof(avl_map_t));
@@ -543,23 +550,17 @@ void avl_map_middle_order_impl(const avl_node_t *node, avl_foreach fn) {
   }
 }
 
-void avl_map_middle_order(const avl_map_t *map, avl_foreach fn) {
+void avl_map_foreach(const avl_map_t *map, avl_foreach fn) {
   avl_map_middle_order_impl(map->root, fn);
 }
-
-static char set_value[0];
-
-typedef struct _avl_set {
-  avl_map_t *map;
-  size_t size;
-} avl_set_t;
 
 avl_set_t *avl_set_new(size_t key_obj_size, avl_cmp_fn cmp_fn) {
   avl_map_t *map = avl_map_new(key_obj_size, sizeof(set_value), cmp_fn);
   if (!map) return NULL;
   avl_set_t *set = (avl_set_t *)malloc(sizeof(avl_set_t));
   if (!set) {
-    free(map);
+    avl_map_drop(map);
+    map = NULL;
     return NULL;
   }
   set->map = map;
@@ -589,6 +590,82 @@ bool avl_set_drop(avl_set_t *set) {
   free(set);
   set = NULL;
   return flag;
+}
+
+void avl_set_intersect_check(const void *key, const avl_set_t *set1,
+                             const avl_set_t *set2, avl_set_t *out_set) {
+  bool flag1 = avl_set_contains(set1, key);
+  bool flag2 = avl_set_contains(set2, key);
+  if (flag1 && flag2) {
+    avl_set_add(out_set, key);
+  }
+}
+
+void avl_set_intersect_impl(avl_node_t *node, const avl_set_t *set1,
+                            const avl_set_t *set2, avl_set_t *out_set,
+                            void (*check_fn)(const void *, const avl_set_t *,
+                                             const avl_set_t *, avl_set_t *)) {
+  if (node) {
+    avl_set_intersect_impl(node->left, set1, set2, out_set, check_fn);
+    check_fn(node->pair.key, set1, set2, out_set);
+    avl_set_intersect_impl(node->right, set1, set2, out_set, check_fn);
+  }
+}
+
+avl_set_t *avl_set_intersect(const avl_set_t *set1, const avl_set_t *set2) {
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_intersect_impl(set1->map->root, set1, set2, out,
+                         avl_set_intersect_check);
+  avl_set_intersect_impl(set2->map->root, set1, set2, out,
+                         avl_set_intersect_check);
+  return out;
+}
+
+void avl_set_union_add(const void *key, avl_set_t *out_set) {
+  avl_set_add(out_set, key);
+}
+
+void avl_set_union_impl(avl_node_t *node, avl_set_t *out_set,
+                        void(set_union_fn)(const void *, avl_set_t *)) {
+  if (node) {
+    avl_set_union_impl(node, out_set, set_union_fn);
+    set_union_fn(node->pair.key, out_set);
+    avl_set_union_impl(node, out_set, set_union_fn);
+  }
+}
+
+avl_set_t *avl_set_union(const avl_set_t *set1, const avl_set_t *set2) {
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_union_impl(set1->map->root, out, avl_set_union_add);
+  avl_set_union_impl(set2->map->root, out, avl_set_union_add);
+  return out;
+}
+
+void avl_set_diff_check(const void *key, const avl_set_t *set1,
+                        const avl_set_t *set2, avl_set_t *out_set) {
+  bool flag1 = avl_set_contains(set1, key);
+  bool flag2 = avl_set_contains(set2, key);
+  if (flag1 && !flag2) {
+    avl_set_add(out_set, key);
+  }
+}
+
+void avl_set_diff_impl(avl_node_t *node, const avl_set_t *set1,
+                       const avl_set_t *set2, avl_set_t *out_set,
+                       void (*check_fn)(const void *, const avl_set_t *,
+                                        const avl_set_t *, avl_set_t *)) {
+  if (node) {
+    avl_set_diff_impl(node->left, set1, set2, out_set, check_fn);
+    check_fn(node->pair.key, set1, set2, out_set);
+    avl_set_diff_impl(node->right, set1, set2, out_set, check_fn);
+  }
+}
+
+avl_set_t *avl_set_diff(const avl_set_t *set1, const avl_set_t *set2) {
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_diff_impl(set1->map->root, set1, set2, out, avl_set_diff_check);
+  avl_set_diff_impl(set2->map->root, set1, set2, out, avl_set_diff_check);
+  return out;
 }
 
 #endif
