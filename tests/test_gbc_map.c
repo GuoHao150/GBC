@@ -78,8 +78,28 @@ void test_map_new(void) {
   avl_map_drop(map);
 }
 
+void test_gbc_set(void) {
+  avl_set_t *set = avl_set_new(sizeof(int), int_cmp);
+  int n = 17;
+  for (int i = 0; i < n; ++i) {
+    avl_set_add(set, &i);
+  }
+  assert(set->size == n);
+  int n1 = 10;
+  int n2 = 5;
+  int n3 = 4;
+  avl_set_add(set, &n1);
+  avl_set_add(set, &n2);
+  avl_set_add(set, &n3);
+  assert(set->size == n);
+  avl_set_drop(set);
+  // assert(set->size == 0);
+  printf("\n");
+}
+
 int main() {
-  test_map_del();
-  // test_map_new();
+  // test_map_del();
+  //  test_map_new();
+  test_gbc_set();
   return 0;
 }

@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "gbc_vector.h"
-
 #define avl_max(a, b) (((a) < (b)) ? (b) : (a))
 
 /// @brief the avl key type
@@ -31,7 +29,7 @@ typedef struct _avl_node avl_node_t;
 /// @param size_t size: the size of map
 /// @param size_t key_obj_size: the key object size
 /// @param size_t val_obj_size: the value object size
-typedef struct _avl avl_map_t;
+typedef struct _avl_map avl_map_t;
 
 /// @brief the compare function for the keys in the map
 /// return 0 if equal;
@@ -161,7 +159,7 @@ bool avl_node_drop(avl_node_t *node) {
   return true;
 }
 
-typedef struct _avl {
+typedef struct _avl_map {
   avl_cmp_fn cmp_fn;
   avl_node_t *root;
   size_t size;
@@ -331,18 +329,6 @@ static const avl_node_t *avl_get_node(const avl_map_t *map,
     }
   }
   return node;
-}
-
-/// @brief swap the key-value pair in node1 to the pair in node2
-/// @param node1
-/// @param node2
-static void avl_swap_kv(avl_node_t *node1, avl_node_t *node2) {
-  char *tmp_key = node1->pair.key;
-  char *tmp_val = node1->pair.val;
-  node1->pair.key = node2->pair.key;
-  node1->pair.val = node2->pair.val;
-  node2->pair.key = tmp_key;
-  node2->pair.val = tmp_val;
 }
 
 static avl_node_t *avl_get_node_mut(const avl_map_t *map, const avl_key_t key) {
@@ -559,6 +545,50 @@ void avl_map_middle_order_impl(const avl_node_t *node, avl_foreach fn) {
 
 void avl_map_middle_order(const avl_map_t *map, avl_foreach fn) {
   avl_map_middle_order_impl(map->root, fn);
+}
+
+static char set_value[0];
+
+typedef struct _avl_set {
+  avl_map_t *map;
+  size_t size;
+} avl_set_t;
+
+avl_set_t *avl_set_new(size_t key_obj_size, avl_cmp_fn cmp_fn) {
+  avl_map_t *map = avl_map_new(key_obj_size, sizeof(set_value), cmp_fn);
+  if (!map) return NULL;
+  avl_set_t *set = (avl_set_t *)malloc(sizeof(avl_set_t));
+  if (!set) {
+    free(map);
+    return NULL;
+  }
+  set->map = map;
+  set->size = 0;
+}
+
+bool avl_set_add(avl_set_t *set, const avl_key_t key) {
+  bool contains = avl_map_contains(set->map, key);
+  if (contains) return false;
+  bool flag = avl_map_add(set->map, key, set_value);
+  if (flag) set->size++;
+  return flag;
+}
+
+bool avl_set_del(avl_set_t *set, const avl_key_t key) {
+  bool flag = avl_map_del(set->map, key);
+  if (flag) set->size--;
+  return flag;
+}
+
+bool avl_set_contains(const avl_set_t *set, const avl_key_t key) {
+  return avl_map_contains(set->map, key);
+}
+
+bool avl_set_drop(avl_set_t *set) {
+  bool flag = avl_map_drop(set->map);
+  free(set);
+  set = NULL;
+  return flag;
 }
 
 #endif
