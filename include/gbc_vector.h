@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gbc_iterator.h"
+
 #define DEFAULT_VEC_CAP 8
 
 /// @brief The Vector collection
@@ -16,6 +18,13 @@ typedef struct _vec {
   size_t obj_size;
   char *buf;
 } vec_t;
+
+/// @brief The vector iterator
+typedef struct _vec_iter {
+  iter_t base;
+  size_t cur_idx;
+  vec_t *vec;
+} vec_iter_t;
 
 /// @brief create a new vector
 /// @param obj_size the size of each element
@@ -111,6 +120,31 @@ bool vec_sort(vec_t *vec, int (*cmp_fn)(const void *, const void *));
 /// @param vec
 /// @return
 bool vec_reverse(vec_t *vec);
+
+/// @brief create a vec_iter_t
+/// @param vec
+/// @return
+vec_iter_t *vec_iter_new(vec_t *vec);
+
+/// @brief drop a vec_iter_t
+/// @param iter
+/// @return
+bool vec_iter_drop(vec_iter_t *iter);
+
+/// @brief to check if the vec_iter_t has next element
+/// @param iter
+/// @return
+bool vec_iter_has_next(const vec_iter_t *iter);
+
+/// @brief get the next element
+/// @param iter
+/// @return
+void *vec_iter_next(vec_iter_t *iter);
+
+/// @brief create a vec_t from an iterator
+/// @param iter
+/// @return
+vec_t *vec_from_iter(iter_t *iter);
 
 vec_t *vec_new(size_t obj_size) {
   char *buf = (char *)malloc(obj_size * DEFAULT_VEC_CAP);
@@ -303,6 +337,61 @@ bool vec_reverse(vec_t *v) {
     end--;
   }
   return true;
+}
+
+bool _vec_iter_has_next(const iter_t *_iter) {
+  const vec_iter_t *iter = (vec_iter_t *)_iter;
+  return iter->cur_idx < iter->vec->size;
+}
+
+void *_vec_iter_next(iter_t *_iter) {
+  vec_iter_t *iter = (vec_iter_t *)_iter;
+  if (!_vec_iter_has_next(_iter)) {
+    return NULL;
+  } else {
+    void *out = vec_at_mut(iter->vec, iter->cur_idx);
+    iter->cur_idx++;
+    return out;
+  }
+}
+
+vec_iter_t *vec_iter_new(vec_t *vec) {
+  assert(vec);
+  vec_iter_t *iter = (vec_iter_t *)malloc(sizeof(vec_iter_t));
+  if (!iter) {
+    return NULL;
+  }
+  iter_t base = {.obj_size = vec->obj_size,
+                 .has_next = _vec_iter_has_next,
+                 .next = _vec_iter_next};
+  iter->base = base;
+  iter->cur_idx = 0;
+  iter->vec = vec;
+  return iter;
+}
+
+bool vec_iter_drop(vec_iter_t *iter) {
+  if (!iter) return false;
+  free(iter);
+  return true;
+}
+
+bool vec_iter_has_next(const vec_iter_t *iter) {
+  return iter->base.has_next((iter_t *)iter);
+}
+
+void *vec_iter_next(vec_iter_t *iter) {
+  return iter->base.next((iter_t *)iter);
+}
+
+vec_t *vec_from_iter(iter_t *iter) {
+  assert(iter);
+  vec_t *v = vec_new(iter->obj_size);
+  while (iter->has_next(iter)) {
+    const void *out = iter->next(iter);
+    vec_push(v, out);
+  }
+  return v;
 }
 
 #endif

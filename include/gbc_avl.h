@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gbc_iterator.h"
+#include "gbc_vector.h"
+
 #define avl_max(a, b) (((a) < (b)) ? (b) : (a))
 
 /// @brief the avl key type
@@ -56,6 +59,40 @@ typedef struct _avl_node {
   avl_node_t *right;
 } avl_node_t;
 
+/// @brief avl_map_t
+typedef struct _avl_map {
+  avl_cmp_fn cmp_fn;
+  avl_node_t *root;
+  size_t size;
+  size_t key_obj_size;
+  size_t val_obj_size;
+} avl_map_t;
+
+static char set_value[0];
+
+/// @brief avl_set_t
+typedef struct _avl_set {
+  avl_map_t *map;
+  size_t size;
+} avl_set_t;
+
+typedef vec_t *next_nodes_ptr;
+typedef avl_set_t *seen_nodes_ptr;
+
+/// @brief avl_map_iter_t
+typedef struct _avl_map_iter {
+  iter_t base;
+  next_nodes_ptr next_ptrs;  // vec_t<avl_node_t*>
+  seen_nodes_ptr seen_ptrs;  // avl_set_t<avl_node_t*>
+} avl_map_iter_t;
+
+/// @brief avl_set_iter_t
+typedef struct _avl_set_iter {
+  iter_t base;
+  next_nodes_ptr next_ptrs;  // vec_t<avl_node_t*>
+  seen_nodes_ptr seen_ptrs;  // avl_set_t<avl_node_t*>
+} avl_set_iter_t;
+
 /// @brief create a new avl_map_t
 /// @param key_obj_size: object size of the key
 /// @param value_obj_size: object size of the value
@@ -104,6 +141,103 @@ avl_val_t avl_map_get_mut(avl_map_t *map, const avl_key_t key);
 /// @param value
 /// @return
 bool avl_map_update(avl_map_t *map, const avl_key_t key, const avl_val_t value);
+
+/// @brief drop the avl_map_t
+/// @param map
+/// @return
+bool avl_map_drop(avl_map_t *map);
+
+/// @brief middle order foreach
+/// @param map
+/// @param fn
+void avl_map_foreach(const avl_map_t *map, avl_foreach fn);
+
+/// @brief create a new avl_set_t
+/// @param key_obj_size
+/// @param cmp_fn
+/// @return
+avl_set_t *avl_set_new(size_t key_obj_size, avl_cmp_fn cmp_fn);
+
+/// @brief adding an element into the set
+/// @param set
+/// @param key
+/// @return
+bool avl_set_add(avl_set_t *set, const avl_key_t key);
+
+/// @brief delete an element in the set
+/// @param set
+/// @param key
+/// @return
+bool avl_set_del(avl_set_t *set, const avl_key_t key);
+
+/// @brief to check if the set contains an element
+/// @param set
+/// @param key
+/// @return
+bool avl_set_contains(const avl_set_t *set, const avl_key_t key);
+
+/// @brief drop a set
+/// @param set
+/// @return
+bool avl_set_drop(avl_set_t *set);
+
+/// @brief intersection of two sets
+/// @param set1
+/// @param set2
+/// @return
+avl_set_t *avl_set_intersection(avl_set_t *set1, avl_set_t *set2);
+
+/// @brief union of two sets
+/// @param set1
+/// @param set2
+/// @return
+avl_set_t *avl_set_union(avl_set_t *set1, avl_set_t *set2);
+
+/// @brief difference operation of two sets
+/// @param set1
+/// @param set2
+/// @return
+avl_set_t *avl_set_diff(avl_set_t *set1, avl_set_t *set2);
+
+/// @brief create an avl_map_iter_t
+/// @param map
+/// @return
+avl_map_iter_t *avl_map_iter_new(avl_map_t *map);
+
+/// @brief create an avl_set_iter_t
+/// @param set
+/// @return
+avl_set_iter_t *avl_set_iter_new(avl_set_t *set);
+
+/// @brief drop an avl_map_iter_t
+/// @param iter
+/// @return
+bool avl_map_iter_drop(avl_map_iter_t *iter);
+
+/// @brief drop an avl_set_iter_t
+/// @param iter
+/// @return
+bool avl_set_iter_drop(avl_set_iter_t *iter);
+
+/// @brief to check if the avl_map_iter_t has next element
+/// @param iter
+/// @return
+bool avl_map_iter_has_next(const avl_map_iter_t *iter);
+
+/// @brief to check if the avl_set_iter_t has next element
+/// @param iter
+/// @return
+bool avl_set_iter_has_next(const avl_set_iter_t *iter);
+
+/// @brief get next avl_pair_t*
+/// @param iter
+/// @return
+avl_pair_t *avl_map_iter_next(avl_map_iter_t *iter);
+
+/// @brief get next avl_pair_t*
+/// @param iter
+/// @return
+void *avl_set_iter_next(avl_set_iter_t *iter);
 
 avl_node_t *avl_node_new(const avl_key_t _key, size_t _key_obj_size,
                          const avl_val_t _value, size_t _value_obj_size) {
@@ -158,21 +292,6 @@ bool avl_node_drop(avl_node_t *node) {
   node = NULL;
   return true;
 }
-
-typedef struct _avl_map {
-  avl_cmp_fn cmp_fn;
-  avl_node_t *root;
-  size_t size;
-  size_t key_obj_size;
-  size_t val_obj_size;
-} avl_map_t;
-
-static char set_value[0];
-
-typedef struct _avl_set {
-  avl_map_t *map;
-  size_t size;
-} avl_set_t;
 
 avl_map_t *avl_map_new(size_t key_obj_size, size_t value_obj_size,
                        avl_cmp_fn cmp_fn) {
@@ -590,6 +709,241 @@ bool avl_set_drop(avl_set_t *set) {
   free(set);
   set = NULL;
   return flag;
+}
+
+bool _avl_map_iter_has_next(const iter_t *_iter) {
+  const avl_map_iter_t *iter = (avl_map_iter_t *)_iter;
+  return iter->next_ptrs->size > 0;
+}
+
+bool _avl_set_iter_has_next(const iter_t *_iter) {
+  const avl_set_iter_t *iter = (avl_set_iter_t *)_iter;
+  return iter->next_ptrs->size > 0;
+}
+
+#define _avl_iter_next                                                         \
+  avl_node_t *out = NULL;                                                      \
+  for (;;) {                                                                   \
+    if (iter->next_ptrs->size == 0) break;                                     \
+    avl_node_t **cur_node_ptr =                                                \
+        (avl_node_t **)vec_at_mut(iter->next_ptrs, iter->next_ptrs->size - 1); \
+    if (!cur_node_ptr) {                                                       \
+      vec_del_top(iter->next_ptrs);                                            \
+      continue;                                                                \
+    }                                                                          \
+    avl_node_t *cur_left = (*cur_node_ptr)->left;                              \
+    avl_node_t *cur_right = (*cur_node_ptr)->right;                            \
+    avl_node_t *cur_left_ptr = NULL;                                           \
+    avl_node_t *cur_right_ptr = NULL;                                          \
+    if (cur_left && !avl_set_contains(iter->seen_ptrs, &cur_left)) {           \
+      cur_left_ptr = cur_left;                                                 \
+    }                                                                          \
+    if (cur_right && !avl_set_contains(iter->seen_ptrs, &cur_right)) {         \
+      cur_right_ptr = cur_right;                                               \
+    }                                                                          \
+                                                                               \
+    if (!cur_left_ptr && cur_right_ptr) {                                      \
+      out = *cur_node_ptr;                                                     \
+      vec_del_top(iter->next_ptrs);                                            \
+      avl_set_add(iter->seen_ptrs, &out);                                      \
+      vec_push(iter->next_ptrs, &cur_right_ptr);                               \
+      break;                                                                   \
+    } else if (cur_left_ptr && cur_right_ptr) {                                \
+      vec_push(iter->next_ptrs, &cur_left_ptr);                                \
+      continue;                                                                \
+    } else if (!cur_left_ptr && !cur_right_ptr) {                              \
+      out = *cur_node_ptr;                                                     \
+      vec_del_top(iter->next_ptrs);                                            \
+      avl_set_add(iter->seen_ptrs, &out);                                      \
+      break;                                                                   \
+    } else {                                                                   \
+      /* cur_left && !cur_right */                                             \
+      vec_push(iter->next_ptrs, &cur_left_ptr);                                \
+      continue;                                                                \
+    }                                                                          \
+  }                                                                            \
+  if (!out) return NULL;                                                       \
+  avl_pair_t *pair_ptr = &out->pair;                                           \
+  return pair_ptr;
+
+void *_avl_map_iter_next(iter_t *_iter) {
+  avl_map_iter_t *iter = (avl_map_iter_t *)_iter;
+  _avl_iter_next
+}
+
+void *_avl_set_iter_next(iter_t *_iter) {
+  avl_set_iter_t *iter = (avl_set_iter_t *)_iter;
+  _avl_iter_next
+}
+
+typedef avl_node_t *avl_node_ptr;
+
+static int avl_node_ptr_cmp(const void *n1, const void *n2) {
+  const avl_node_ptr *a1 = (avl_node_ptr *)n1;
+  const avl_node_ptr *a2 = (avl_node_ptr *)n2;
+  if (*a1 == *a2)
+    return 0;
+  else if (*a1 < *a2)
+    return -1;
+  else
+    return 1;
+}
+
+avl_map_iter_t *avl_map_iter_new(avl_map_t *map) {
+  assert(map);
+  avl_map_iter_t *iter = (avl_map_iter_t *)malloc(sizeof(avl_map_iter_t));
+  if (!iter) {
+    return NULL;
+  }
+  iter_t base = {.obj_size = sizeof(avl_pair_t),
+                 .has_next = _avl_map_iter_has_next,
+                 .next = _avl_map_iter_next};
+  iter->base = base;
+  next_nodes_ptr next_ptrs = vec_new(sizeof(avl_node_t *));
+  if (!next_ptrs) {
+    free(iter);
+    return NULL;
+  }
+  seen_nodes_ptr seen_ptrs =
+      avl_set_new(sizeof(avl_node_t *), avl_node_ptr_cmp);
+  if (!seen_ptrs) {
+    free(iter);
+    vec_drop(next_ptrs);
+    return NULL;
+  }
+  if (map->size > 0) {
+    vec_push(next_ptrs, &map->root);
+  }
+  iter->base = base;
+  iter->next_ptrs = next_ptrs;
+  iter->seen_ptrs = seen_ptrs;
+  return iter;
+}
+
+avl_set_iter_t *avl_set_iter_new(avl_set_t *set) {
+  assert(set);
+  avl_set_iter_t *iter = (avl_set_iter_t *)malloc(sizeof(avl_set_iter_t));
+  if (!iter) return NULL;
+  iter_t base = {.obj_size = sizeof(avl_pair_t),
+                 .has_next = _avl_set_iter_has_next,
+                 .next = _avl_set_iter_next};
+  iter->base = base;
+  next_nodes_ptr next_ptrs = vec_new(sizeof(avl_node_t *));
+  if (!next_ptrs) {
+    free(iter);
+    return NULL;
+  }
+  seen_nodes_ptr seen_ptrs =
+      avl_set_new(sizeof(avl_node_t *), avl_node_ptr_cmp);
+  if (!seen_ptrs) {
+    free(iter);
+    vec_drop(next_ptrs);
+    return NULL;
+  }
+  if (set->size > 0) {
+    vec_push(next_ptrs, &(set->map->root));
+  }
+  iter->base = base;
+  iter->next_ptrs = next_ptrs;
+  iter->seen_ptrs = seen_ptrs;
+  return iter;
+}
+
+#define _avl_iter_drop             \
+  if (!iter) return false;         \
+  if (iter->next_ptrs) {           \
+    vec_drop(iter->next_ptrs);     \
+    iter->next_ptrs = NULL;        \
+  }                                \
+  if (iter->seen_ptrs) {           \
+    avl_set_drop(iter->seen_ptrs); \
+    iter->seen_ptrs = NULL;        \
+  }                                \
+  free(iter);                      \
+  return true;
+
+bool avl_map_iter_drop(avl_map_iter_t *iter) { _avl_iter_drop }
+
+bool avl_set_iter_drop(avl_set_iter_t *iter) { _avl_iter_drop }
+
+bool avl_map_iter_has_next(const avl_map_iter_t *iter) {
+  return iter->base.has_next((iter_t *)iter);
+}
+
+bool avl_set_iter_has_next(const avl_set_iter_t *iter) {
+  return iter->base.has_next((iter_t *)iter);
+}
+
+avl_pair_t *avl_map_iter_next(avl_map_iter_t *iter) {
+  if (!avl_map_iter_has_next(iter)) return NULL;
+  void *out = iter->base.next((iter_t *)iter);
+  return (avl_pair_t *)out;
+}
+
+void *avl_set_iter_next(avl_set_iter_t *iter) {
+  if (!avl_set_iter_has_next(iter)) return NULL;
+  avl_pair_t *out = (avl_pair_t *)iter->base.next((iter_t *)iter);
+  return out->key;
+}
+
+avl_set_t *avl_set_intersection(avl_set_t *set1, avl_set_t *set2) {
+  assert(set1 && set2);
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_iter_t *iter1 = avl_set_iter_new(set1);
+  avl_set_iter_t *iter2 = avl_set_iter_new(set2);
+  while (avl_set_iter_has_next(iter1)) {
+    const avl_key_t n = avl_set_iter_next(iter1);
+    bool in_set1 = avl_set_contains(set1, n);
+    bool in_set2 = avl_set_contains(set2, n);
+    if (in_set1 && in_set2) {
+      avl_set_add(out, n);
+    }
+  }
+  while (avl_set_iter_has_next(iter2)) {
+    const avl_key_t n = avl_set_iter_next(iter2);
+    bool in_set1 = avl_set_contains(set1, n);
+    bool in_set2 = avl_set_contains(set2, n);
+    if (in_set1 && in_set2) {
+      avl_set_add(out, n);
+    }
+  }
+  avl_set_iter_drop(iter1);
+  avl_set_iter_drop(iter2);
+  return out;
+}
+
+avl_set_t *avl_set_union(avl_set_t *set1, avl_set_t *set2) {
+  assert(set1 && set2);
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_iter_t *iter1 = avl_set_iter_new(set1);
+  avl_set_iter_t *iter2 = avl_set_iter_new(set2);
+  while (avl_set_iter_has_next(iter1)) {
+    const avl_key_t n = avl_set_iter_next(iter1);
+    avl_set_add(out, n);
+  }
+  while (avl_set_iter_has_next(iter2)) {
+    const avl_key_t n = avl_set_iter_next(iter2);
+    avl_set_add(out, n);
+  }
+  avl_set_iter_drop(iter1);
+  avl_set_iter_drop(iter2);
+  return out;
+}
+
+avl_set_t *avl_set_diff(avl_set_t *set1, avl_set_t *set2) {
+  assert(set1 && set2);
+  avl_set_t *out = avl_set_new(set1->map->key_obj_size, set1->map->cmp_fn);
+  avl_set_iter_t *iter1 = avl_set_iter_new(set1);
+  while (avl_set_iter_has_next(iter1)) {
+    const avl_key_t n = avl_set_iter_next(iter1);
+    bool in_set1 = avl_set_contains(set1, n);
+    bool in_set2 = avl_set_contains(set2, n);
+    if (in_set1 && !in_set2) {
+      avl_set_add(out, n);
+    }
+  }
+  avl_set_iter_drop(iter1);
+  return out;
 }
 
 #endif

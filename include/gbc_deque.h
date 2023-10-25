@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "gbc_iterator.h"
+
 #define DEFAULT_DQ_SIZE 8
 
 /// @brief vector double-ended queue
@@ -18,6 +20,13 @@ typedef struct _vdq_t {
   size_t size;
   char *buf;
 } vdq_t;
+
+/// @brief The vector deque iterator
+typedef struct _vdq_iter_t {
+  iter_t base;
+  size_t cur_idx;
+  vdq_t *dq;
+} vdq_iter_t;
 
 /// @brief create a new vdq_t
 /// @param element_size: the size of each element
@@ -143,6 +152,31 @@ bool vdq_sort(vdq_t *q, int (*cmp_fn)(const void *, const void *));
 /// @param obj_size
 /// @return
 vdq_t *vdq_from_array(const void *_arr, size_t array_size, size_t obj_size);
+
+/// @brief create a new vdq_iter_t
+/// @param dq
+/// @return
+vdq_iter_t *vdq_iter_new(vdq_t *dq);
+
+/// @brief drop a vdq_iter_t
+/// @param iter
+/// @return
+bool vdq_iter_drop(vdq_iter_t *iter);
+
+/// @brief check if the vdq_iter_t has next element
+/// @param iter
+/// @return
+bool vdq_iter_has_next(const vdq_iter_t *iter);
+
+/// @brief get the next element
+/// @param iter
+/// @return
+void *vdq_iter_next(vdq_iter_t *iter);
+
+/// @brief create a vdq_t from an iterator
+/// @param iter
+/// @return
+vdq_t *vdq_from_iter(iter_t *iter);
 
 vdq_t *vdq_new(size_t element_size) {
   char *buf = (char *)malloc(DEFAULT_DQ_SIZE * element_size);
@@ -420,6 +454,61 @@ vdq_t *vdq_from_array(const void *_arr, size_t array_size, size_t obj_size) {
   q->front = 0;
   q->rear = array_size;
   return q;
+}
+
+bool _vdq_iter_has_next(const iter_t *_iter) {
+  const vdq_iter_t *iter = (vdq_iter_t *)_iter;
+  return iter->cur_idx < iter->dq->size;
+}
+
+void *_vdq_iter_next(iter_t *_iter) {
+  vdq_iter_t *iter = (vdq_iter_t *)_iter;
+  if (!_vdq_iter_has_next(_iter)) {
+    return NULL;
+  } else {
+    void *out = vdq_at_mut(iter->dq, iter->cur_idx);
+    iter->cur_idx++;
+    return out;
+  }
+}
+
+vdq_iter_t *vdq_iter_new(vdq_t *dq) {
+  assert(dq);
+  vdq_iter_t *iter = (vdq_iter_t *)malloc(sizeof(vdq_iter_t));
+  if (!iter) {
+    return NULL;
+  }
+  iter_t base = {.obj_size = dq->obj_size,
+                 .has_next = _vdq_iter_has_next,
+                 .next = _vdq_iter_next};
+  iter->base = base;
+  iter->cur_idx = 0;
+  iter->dq = dq;
+  return iter;
+}
+
+bool vdq_iter_drop(vdq_iter_t *iter) {
+  if (!iter) return false;
+  free(iter);
+  return true;
+}
+
+bool vdq_iter_has_next(const vdq_iter_t *iter) {
+  return iter->base.has_next((iter_t *)iter);
+}
+
+void *vdq_iter_next(vdq_iter_t *iter) {
+  return iter->base.next((iter_t *)iter);
+}
+
+vdq_t *vdq_from_iter(iter_t *iter) {
+  assert(iter);
+  vdq_t *dq = vdq_new(iter->obj_size);
+  while (iter->has_next(iter)) {
+    const void *out = iter->next(iter);
+    vdq_push_back(dq, out);
+  }
+  return dq;
 }
 
 #endif
